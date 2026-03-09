@@ -26,8 +26,14 @@ pub mod secp256k1_scalar;
 pub mod types;
 pub mod zero_poly_coset;
 
+#[cfg(feature = "cuda")]
+pub mod fft_gpu;
+
 #[cfg(test)]
 mod field_testing;
 
 #[cfg(test)]
 mod prime_field_testing;
+
+#[cfg(test)]
+mod ntt_compare_test;

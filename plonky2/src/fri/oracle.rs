@@ -22,6 +22,15 @@ use crate::util::reducing::ReducingFactor;
 use crate::util::timing::TimingTree;
 use crate::util::{log2_strict, reverse_bits, reverse_index_bits_in_place, transpose};
 
+#[cfg(feature = "cuda")]
+use core::any::TypeId;
+#[cfg(feature = "cuda")]
+use crate::field::goldilocks_field::GoldilocksField;
+#[cfg(feature = "cuda")]
+use plonky2_field::fft_gpu::{lde_batch_coset_gpu, should_use_gpu};
+#[cfg(feature = "cuda")]
+use plonky2_field::types::Sample;
+
 /// Four (~64 bit) field elements gives ~128 bit security.
 pub const SALT_SIZE: usize = 4;
 
@@ -88,6 +97,46 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         fft_root_table: Option<&FftRootTable<F>>,
     ) -> Self {
         let degree = polynomials[0].len();
+
+        // Use GPU LDE for GoldilocksField when cuda feature is enabled
+        #[cfg(feature = "cuda")]
+        let lde_values = {
+            let output_size = degree << rate_bits;
+            if TypeId::of::<F>() == TypeId::of::<GoldilocksField>()
+                && should_use_gpu(output_size)
+                && polynomials.len() >= 2
+            {
+                log::info!("GPU LDE: degree={}, rate_bits={}, output_size={}, num_polys={}",
+                    degree, rate_bits, output_size, polynomials.len());
+                // SAFETY: We verified F == GoldilocksField above
+                let gl_polys: &[PolynomialCoeffs<GoldilocksField>] = unsafe {
+                    core::mem::transmute(polynomials.as_slice())
+                };
+                let mut results = timed!(
+                    timing,
+                    "GPU FFT + blinding",
+                    lde_batch_coset_gpu(gl_polys, rate_bits)
+                );
+
+                // Add salt if blinding
+                if blinding {
+                    for _ in 0..SALT_SIZE {
+                        results.push(GoldilocksField::rand_vec(output_size));
+                    }
+                }
+
+                // SAFETY: GoldilocksField == F
+                unsafe { core::mem::transmute::<Vec<Vec<GoldilocksField>>, Vec<Vec<F>>>(results) }
+            } else {
+                timed!(
+                    timing,
+                    "FFT + blinding",
+                    Self::lde_values(&polynomials, rate_bits, blinding, fft_root_table)
+                )
+            }
+        };
+
+        #[cfg(not(feature = "cuda"))]
         let lde_values = timed!(
             timing,
             "FFT + blinding",

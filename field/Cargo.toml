@@ -22,6 +22,14 @@ unroll = { workspace = true }
 # Local dependencies
 plonky2_util = { version = "1.0.0", path = "../util", default-features = false }
 
+# Optional GPU acceleration
+zeknox = { path = "../../zeknox/wrappers/rust", optional = true }
+once_cell = { version = "1.20.2", optional = true }
+
+[features]
+default = []
+cuda = ["zeknox/cuda", "zeknox/gl64", "once_cell"]
+
 
 # Display math equations properly in documentation
 [package.metadata.docs.rs]

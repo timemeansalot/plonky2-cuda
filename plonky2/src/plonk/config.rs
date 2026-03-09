@@ -24,6 +24,16 @@ use crate::hash::poseidon2::hash::Poseidon2Hash;
 use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
 
+/// Enum to identify hash function types for GPU acceleration
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[repr(u64)]
+pub enum HasherType {
+    Poseidon = 0,
+    Keccak = 1,
+    PoseidonBN128 = 2,
+    Poseidon2 = 3,
+}
+
 pub trait GenericHashOut<F: RichField>:
     Copy + Clone + Debug + Eq + PartialEq + Send + Sync + Serialize + DeserializeOwned
 {
@@ -37,6 +47,9 @@ pub trait GenericHashOut<F: RichField>:
 pub trait Hasher<F: RichField>: Sized + Copy + Debug + Eq + PartialEq {
     /// Size of `Hash` in bytes.
     const HASH_SIZE: usize;
+
+    /// Type of hasher for GPU dispatch
+    const HASHER_TYPE: HasherType;
 
     /// Hash Output
     type Hash: GenericHashOut<F>;
