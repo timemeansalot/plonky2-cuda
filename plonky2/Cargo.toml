@@ -17,7 +17,7 @@ gate_testing = []
 parallel = ["hashbrown/rayon", "plonky2_maybe_rayon/parallel"]
 std = ["anyhow/std", "rand/std", "itertools/use_std"]
 timing = ["std", "dep:web-time"]
-cuda = ["plonky2_field/cuda"]
+cuda = ["plonky2_field/cuda", "dep:zeknox"]
 
 [dependencies]
 ahash = { workspace = true }
@@ -38,6 +38,9 @@ web-time = { version = "1.0.0", optional = true }
 plonky2_field = { version = "1.0.0", path = "../field", default-features = false }
 plonky2_maybe_rayon = { version = "1.0.0", path = "../maybe_rayon", default-features = false }
 plonky2_util = { version = "1.0.0", path = "../util", default-features = false }
+
+# GPU acceleration (optional)
+zeknox = { path = "../../zeknox/wrappers/rust", optional = true, features = ["cuda", "gl64"] }
 
 # Plonky3 dependencies for Poseidon2
 p3-poseidon2 = { git = "https://github.com/Plonky3/Plonky3.git", rev = "eeb4e37b20127c4daa871b2bad0df30a7c7380db" }
