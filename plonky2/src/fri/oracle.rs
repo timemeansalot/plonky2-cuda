@@ -20,7 +20,9 @@ use crate::plonk::config::GenericConfig;
 use crate::timed;
 use crate::util::reducing::ReducingFactor;
 use crate::util::timing::TimingTree;
-use crate::util::{log2_strict, reverse_bits, reverse_index_bits_in_place, transpose};
+use crate::util::{log2_strict, reverse_bits};
+#[cfg(not(feature = "cuda"))]
+use crate::util::{reverse_index_bits_in_place, transpose};
 
 #[cfg(feature = "cuda")]
 use core::any::TypeId;
@@ -30,6 +32,8 @@ use crate::field::goldilocks_field::GoldilocksField;
 use plonky2_field::fft_gpu::{lde_batch_coset_gpu, should_use_gpu};
 #[cfg(feature = "cuda")]
 use plonky2_field::types::Sample;
+#[cfg(feature = "cuda")]
+use crate::util::transpose_gpu::transpose_and_reverse;
 
 /// Four (~64 bit) field elements gives ~128 bit security.
 pub const SALT_SIZE: usize = 4;
@@ -143,8 +147,21 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             Self::lde_values(&polynomials, rate_bits, blinding, fft_root_table)
         );
 
-        let mut leaves = timed!(timing, "transpose LDEs", transpose(&lde_values));
-        reverse_index_bits_in_place(&mut leaves);
+        // Transpose and bit-reverse: use GPU when available
+        #[cfg(feature = "cuda")]
+        let leaves = timed!(
+            timing,
+            "transpose + bit-reverse",
+            transpose_and_reverse(&lde_values)
+        );
+
+        #[cfg(not(feature = "cuda"))]
+        let leaves = {
+            let mut leaves = timed!(timing, "transpose LDEs", transpose(&lde_values));
+            reverse_index_bits_in_place(&mut leaves);
+            leaves
+        };
+
         let merkle_tree = timed!(
             timing,
             "build Merkle tree",
